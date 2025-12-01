@@ -1,13 +1,15 @@
-// import Stripe from "stripe";
+import Stripe from "stripe";
 import dotenv from "dotenv";
 dotenv.config();
 
-// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// -----------------------------------
 // One-time payment
+// -----------------------------------
 export const createPaymentIntent = async (req, res) => {
   try {
-    const { amount } = req.body; // in cents
+    const { amount } = req.body; // amount in cents
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: "usd",
@@ -18,7 +20,9 @@ export const createPaymentIntent = async (req, res) => {
   }
 };
 
+// -----------------------------------
 // Subscription payment
+// -----------------------------------
 export const createSubscription = async (req, res) => {
   try {
     const { customerId, priceId } = req.body;
@@ -34,31 +38,39 @@ export const createSubscription = async (req, res) => {
   }
 };
 
+// -----------------------------------
 // Webhook handler
+// -----------------------------------
 export const webhookHandler = async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
+
   try {
+    // req.body must be raw (handled in server.js)
     event = stripe.webhooks.constructEvent(
       req.body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
-    console.log("Event type:", event.type);
+
+    console.log("🔔 Webhook received!");
+    console.log(`✅ Event type: ${event.type}`);
 
     if (event.type === "payment_intent.succeeded") {
       const paymentIntent = event.data.object;
-      // Update DB: mark one-time payment as complete
+      console.log("💰 Payment succeeded!", paymentIntent.id);
+      // TODO: update DB
     }
 
     if (event.type === "invoice.payment_succeeded") {
       const invoice = event.data.object;
-      // Update DB: mark subscription as active
+      console.log("💳 Subscription payment succeeded!", invoice.id);
+      // TODO: update DB
     }
 
     res.json({ received: true });
   } catch (err) {
-    console.log("Webhook error:", err.message);
+    console.error(`❌ Webhook error: ${err.message}`);
     res.status(400).send(`Webhook Error: ${err.message}`);
   }
 };
